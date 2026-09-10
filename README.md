@@ -1,4 +1,4 @@
-# A.R.G.O.
+# A.R.G.O. III
 
 **A.R.G.O. — Autonomous Rover for Ground Operations**
 
