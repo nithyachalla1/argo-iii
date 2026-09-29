@@ -1,23 +1,5 @@
 import math;
 
-#initial pose
-initialX = 0;
-initialY = 0;
-initialAngle = 0;
-
-#distance between the 2 wheels
-track_width = 0.6;
-
-# average velocity recorded by the left wheel
-v_left = 0.8;
-# average velocity recorded by the right wheel
-v_right = 1.2;
-
-# the time step; delta time
-dt = 0.01;
-# how long the simulation is run
-simulation_time = 10
-
 def odoSimEstimation(vLeft, vRight, wheelDistance, time, dt, initialX = 0, initialY = 0, initialAngle = 0):
     # check preconditions
     if(type(vLeft) == float | type(vLeft) == int):
@@ -82,10 +64,6 @@ def odometrySimulation(vLeft, vRight, wheelDistance, time, initialX = 0, initial
     elif(time < 0):
         raise ValueError("time must be 0 or greater");
     
-    print(f"intial position (x, y, angle): ({round(initialX, 3)}, {round(initialY, 3)}, {round(initialAngle, 3)})\n"
-        + f"track width: {wheelDistance}\n"
-        + f"velocity (left, right): ({vLeft}, {vRight})\n" 
-        + f"duration: {time}\n")
     # average linear velocity
     v = (vLeft + vRight) / 2;
     # average angular velocity.
@@ -103,8 +81,5 @@ def odometrySimulation(vLeft, vRight, wheelDistance, time, initialX = 0, initial
         # after pose
         finalX = initialX + r * (math.sin(theta + initialAngle) - math.sin(initialAngle));
         finalY = initialY + r * (math.cos(initialAngle) - math.cos(theta + initialAngle));
-        finalAngle = theta;
-    print(f"final position (x, y, angle): ({round(finalX, 3)}, {round(finalY, 3)}, {round(finalAngle, 3)})");
+        finalAngle = theta + initialAngle;
     return (finalX, finalY, finalAngle);
-odometrySimulation(v_left, v_right, track_width, simulation_time, initialX, initialY, initialAngle);
-odoSimEstimation(v_left, v_right, track_width, simulation_time, dt, initialX, initialY, initialAngle);
