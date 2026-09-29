@@ -1,3 +1,5 @@
+import math;
+
 #initial pose
 initialX = 0.0;
 initialY = 0.0;
@@ -16,7 +18,6 @@ dt = 0.1;
 # how long the simulation is run
 simulation_time = 10.0;
 
-
 # 
 def odoSim():
     # average linear velocity
@@ -30,6 +31,6 @@ def odoSim():
     # radius of the path taken
     r = s/theta
     # after pose
-    finalX = initialX + (r-r*cos(theta));
-    finalY = initialY + r*sin(theta);
-    finalAngle = initialAngle+theta;
+    finalX = initialX + (r - r * math.cos(theta));
+    finalY = initialY + r * math.sin(theta);
+    finalAngle = initialAngle + theta;
