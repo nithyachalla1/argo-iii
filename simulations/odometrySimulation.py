@@ -73,6 +73,7 @@ def odometrySimulation(vLeft, vRight, wheelDistance, time, initialX = 0, initial
     if(theta == 0):
         finalX = initialX + v * time * math.cos(initialAngle)
         finalY = initialY + v * time * math.sin(initialAngle)
+        finalAngle = initialAngle
     else:
         # total distance traveled
         s = v * time;
