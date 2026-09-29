@@ -1,9 +1,9 @@
 import math;
 
 #initial pose
-initialX = 2.0;
-initialY = 1.0;
-initialAngle = math.pi/2;
+initialX = 0;
+initialY = 0;
+initialAngle = 0;
 
 #distance between the 2 wheels
 track_width = 0.6;
@@ -16,7 +16,7 @@ v_right = 1.2;
 # the time step; delta time
 dt = 0.01;
 # how long the simulation is run
-simulation_time = 2;
+simulation_time = 10
 
 def odoSimEstimation(vLeft, vRight, wheelDistance, time, dt, initialX = 0, initialY = 0, initialAngle = 0):
     # check preconditions
