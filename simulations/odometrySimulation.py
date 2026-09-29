@@ -15,3 +15,21 @@ v_right = 1.2;
 dt = 0.1;
 # how long the simulation is run
 simulation_time = 10.0;
+
+
+# 
+def odoSim():
+    # average linear velocity
+    v = (v_left + v_right) / 2;
+    # average angular velocity. right is positive, left is negtative
+    omega = (v_right - v_left) / track_width;
+    # angular distance traveled
+    theta = omega * simulation_time;
+    # total distance traveled
+    s = v * simulation_time;
+    # radius of the path taken
+    r = s/theta
+    # after pose
+    finalX = initialX + (r-r*cos(theta));
+    finalY = initialY + r*sin(theta);
+    finalAngle = initialAngle+theta;
