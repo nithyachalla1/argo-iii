@@ -1,22 +1,22 @@
 import math;
-
+import matplotlib;
 def odoSimEstimation(vLeft, vRight, wheelDistance, time, dt, initialX = 0, initialY = 0, initialAngle = 0):
     # check preconditions
-    if(type(vLeft) == float | type(vLeft) == int):
+    if(type(vLeft) != float | type(vLeft) != int):
         raise TypeError("vLeft must be a float or an integer");
-    elif(type(vRight) == float | type(vRight) == int):
+    elif(type(vRight) != float | type(vRight) != int):
             raise TypeError("vRight must be a float or an integer");
-    elif(type(wheelDistance) == float | type(wheelDistance) == int):
+    elif(type(wheelDistance) != float | type(wheelDistance) != int):
             raise TypeError("wheelDistance must be a float or an integer");
-    elif(type(time) == float | type(time) == int):
+    elif(type(time) != float | type(time) != int):
             raise TypeError("d must be a float or an integer");
-    elif(type(dt) == float | type(dt) == int):
-            raise TypeError("dt must be a float or an integer");
-    elif(type(initialX) == float | type(initialX) == int):
+    elif(type(dt) != float | type(dt) != int | dt == 0):
+            raise TypeError("dt must be a non-zero float or an integer");
+    elif(type(initialX) != float | type(initialX) != int):
             raise TypeError("initialX must be a float or an integer");
-    elif(type(initialY) == float | type(initialY) == int):
+    elif(type(initialY) != float | type(initialY) != int):
             raise TypeError("initialY must be a float or an integer");
-    elif(type(initialAngle) == float | type(initialAngle) == int):
+    elif(type(initialAngle) != float | type(initialAngle) != int):
             raise TypeError("initialAngle must be a float or an integer");
     elif(wheelDistance <= 0):
         raise ValueError("wheelDistance must be greater than 0");
@@ -45,19 +45,19 @@ def odoSimEstimation(vLeft, vRight, wheelDistance, time, dt, initialX = 0, initi
 # post: returns the estimated final position of the robot
 def odometrySimulation(vLeft, vRight, wheelDistance, time, initialX = 0, initialY = 0, initialAngle = 0):
     # check preconditions
-    if(type(vLeft) == float | type(vLeft) == int):
+    if(type(vLeft) != float | type(vLeft) != int):
         raise TypeError("vLeft must be a float or an integer");
-    elif(type(vRight) == float | type(vRight) == int):
+    elif(type(vRight) != float | type(vRight) != int):
             raise TypeError("vRight must be a float or an integer");
-    elif(type(wheelDistance) == float | type(wheelDistance) == int):
+    elif(type(wheelDistance) != float | type(wheelDistance) != int):
             raise TypeError("wheelDistance must be a float or an integer");
-    elif(type(time) == float | type(time) == int):
+    elif(type(time) != float | type(time) != int):
             raise TypeError("time must be a float or an integer");
-    elif(type(initialX) == float | type(initialX) == int):
+    elif(type(initialX) != float | type(initialX) != int):
             raise TypeError("initialX must be a float or an integer");
-    elif(type(initialY) == float | type(initialY) == int):
+    elif(type(initialY) != float | type(initialY) != int):
             raise TypeError("initialY must be a float or an integer");
-    elif(type(initialAngle) == float | type(initialAngle) == int):
+    elif(type(initialAngle) != float | type(initialAngle) != int):
             raise TypeError("initialAngle must be a float or an integer");
     elif(wheelDistance <= 0):
         raise ValueError("wheelDistance must be greater than 0");
