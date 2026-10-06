@@ -1,5 +1,6 @@
 import math;
 import matplotlib.pyplot as plt
+from matplotlib.colors import LinearSegmentedColormap, Normalize
 import numpy as np
 def odoSimEstimation(vLeft, vRight, wheelDistance, time, dt, initialX = 0, initialY = 0, initialAngle = 0):
     # check preconditions
@@ -97,18 +98,38 @@ def _createPlot(v, omega, time, initialX, initialY, initialAngle, finalX, finalY
         x = initialX + v * t * math.cos(initialAngle)
         y = initialY + v * t * math.sin(initialAngle)
     else:
-        # total distance traveled
-        s = v * t;
-        # radius of the path taken
-        r = s / theta
-        # after pose
-        x = initialX + r * (np.sin(theta + initialAngle) - np.sin(initialAngle));
-        y = initialY + r * (np.cos(initialAngle) - np.cos(theta + initialAngle));
-    _, ax = plt.subplots()
-    factor = 1.03
-    ax.annotate("start", xytext=(initialX, initialY), xy=(initialX, initialY))
-    ax.annotate("end", xytext=(finalX, finalY), xy=(finalX, finalY))
-    ax.margins(0.2)
-    ax.plot(x, y)
-    plt.show();
+        # The radius is constant for a constant pair of wheel velocities.
+        radius = v / omega
+        x = initialX + radius * (np.sin(theta + initialAngle) - math.sin(initialAngle))
+        y = initialY + radius * (math.cos(initialAngle) - np.cos(theta + initialAngle))
+
+    fig, ax = plt.subplots(figsize=(9, 6), constrained_layout=True)
+    gradient = LinearSegmentedColormap.from_list("start_to_end", ["#1976d2", "#d32f2f"])
+    path = ax.scatter(
+        x,
+        y,
+        c=t,
+        cmap=gradient,
+        norm=Normalize(vmin=0, vmax=max(time, 1e-12)),
+        s=18,
+        zorder=2,
+    )
+    ax.plot(x, y, color="0.35", linewidth=1, alpha=0.45, zorder=1)
+    colorbar = fig.colorbar(path, ax=ax, label="progress through simulation")
+    colorbar.set_ticks([0, time])
+    colorbar.set_ticklabels(["start", "end"])
+
+    ax.scatter(initialX, initialY, color="#1976d2", s=90, label="start", zorder=4)
+    ax.scatter(finalX, finalY, color="#d32f2f", marker="*", s=150, label="end", zorder=4)
+
+    ax.annotate("start", (initialX, initialY), xytext=(8, 8), textcoords="offset points")
+    ax.annotate("end", (finalX, finalY), xytext=(8, 8), textcoords="offset points")
+    ax.set_title("Robot odometry trajectory")
+    ax.set_xlabel("x position")
+    ax.set_ylabel("y position")
+    ax.set_aspect("equal", adjustable="datalim")
+    ax.grid(True, linestyle="--", alpha=0.35)
+    ax.legend(loc="best")
+    ax.margins(0.15)
+    plt.show()
     return ax
