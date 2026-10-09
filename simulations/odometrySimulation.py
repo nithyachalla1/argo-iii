@@ -1,6 +1,9 @@
 import math;
 import matplotlib.pyplot as plt
 from matplotlib.colors import LinearSegmentedColormap, Normalize
+from matplotlib.patches import FancyArrowPatch
+from matplotlib.markers import MarkerStyle
+from matplotlib.transforms import Affine2D
 import numpy as np
 def odoSimEstimation(vLeft, vRight, wheelDistance, time, dt, initialX = 0, initialY = 0, initialAngle = 0):
     # check preconditions
@@ -45,7 +48,7 @@ def odoSimEstimation(vLeft, vRight, wheelDistance, time, dt, initialX = 0, initi
 # runs a simulation based on dead-wheel data to track position.
 # pre: wheelDistance > 0, simulation time >= 0.
 # post: returns the estimated final position of the robot
-def odometrySimulation(vLeft, vRight, wheelDistance, time, initialX = 0, initialY = 0, initialAngle = 0):
+def odometrySimulation(vLeft, vRight, wheelDistance, time, initialX = 0, initialY = 0, initialAngle = 0, creatPlot = True):
     # check preconditions
     print(type(vLeft)== int)
     if(type(vLeft) != float and type(vLeft) != int):
@@ -86,10 +89,11 @@ def odometrySimulation(vLeft, vRight, wheelDistance, time, initialX = 0, initial
         finalX = initialX + r * (math.sin(theta + initialAngle) - math.sin(initialAngle));
         finalY = initialY + r * (math.cos(initialAngle) - math.cos(theta + initialAngle));
         finalAngle = theta + initialAngle;
-    _createPlot(v, omega, time, initialX, initialY, initialAngle, finalX, finalY);
+    if(creatPlot):
+        return(finalX, finalY,finalAngle,_createPlot(v, omega, time, initialX, initialY, initialAngle, finalX, finalY, finalAngle));
     return (finalX, finalY, finalAngle);
 
-def _createPlot(v, omega, time, initialX, initialY, initialAngle, finalX, finalY):
+def _createPlot(v, omega, time, initialX, initialY, initialAngle, finalX, finalY, finalAngle):
     t = np.linspace(0, time, 400)
     # angle relative to 0
     theta = omega * t;
@@ -98,38 +102,36 @@ def _createPlot(v, omega, time, initialX, initialY, initialAngle, finalX, finalY
         x = initialX + v * t * math.cos(initialAngle)
         y = initialY + v * t * math.sin(initialAngle)
     else:
-        # The radius is constant for a constant pair of wheel velocities.
         radius = v / omega
         x = initialX + radius * (np.sin(theta + initialAngle) - math.sin(initialAngle))
         y = initialY + radius * (math.cos(initialAngle) - np.cos(theta + initialAngle))
 
     fig, ax = plt.subplots(figsize=(9, 6), constrained_layout=True)
-    gradient = LinearSegmentedColormap.from_list("start_to_end", ["#1976d2", "#d32f2f"])
+    gradient = LinearSegmentedColormap.from_list("start_to_end", ["#AAAAAA", "#000000"])
+    normalizedTime = t / max(time, 1e-12)
+    exponentialProgress = np.expm1(normalizedTime) / np.expm1(1)
     path = ax.scatter(
         x,
         y,
-        c=t,
+        c=exponentialProgress,
         cmap=gradient,
-        norm=Normalize(vmin=0, vmax=max(time, 1e-12)),
-        s=18,
+        norm=Normalize(vmin=0, vmax=1),
+        s=16,
         zorder=2,
     )
     ax.plot(x, y, color="0.35", linewidth=1, alpha=0.45, zorder=1)
     colorbar = fig.colorbar(path, ax=ax, label="progress through simulation")
-    colorbar.set_ticks([0, time])
+    colorbar.set_ticks([0, 1])
     colorbar.set_ticklabels(["start", "end"])
 
-    ax.scatter(initialX, initialY, color="#1976d2", s=90, label="start", zorder=4)
-    ax.scatter(finalX, finalY, color="#d32f2f", marker="*", s=150, label="end", zorder=4)
+    endMarker = MarkerStyle(">", transform=Affine2D().rotate(finalAngle))
+    ax.scatter(finalX, finalY, color="#000000", marker=endMarker, s=150, zorder=4)
 
-    ax.annotate("start", (initialX, initialY), xytext=(8, 8), textcoords="offset points")
-    ax.annotate("end", (finalX, finalY), xytext=(8, 8), textcoords="offset points")
     ax.set_title("Robot odometry trajectory")
     ax.set_xlabel("x position")
     ax.set_ylabel("y position")
     ax.set_aspect("equal", adjustable="datalim")
     ax.grid(True, linestyle="--", alpha=0.35)
-    ax.legend(loc="best")
     ax.margins(0.15)
     plt.show()
     return ax
