@@ -1,5 +1,5 @@
 opencv-python
 numpy
 pyyaml
-scikit-learn
+scikit-learn==1.9.1  # models/terrain_rugd.joblib was saved with this version
 pytest
