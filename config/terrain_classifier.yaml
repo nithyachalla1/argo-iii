@@ -1,0 +1,31 @@
+# Settings for the terrain classifier (flat / rocky / non-ground).
+# Tune these on the tuning photos only; see data/terrain/README.md.
+
+# --- Image size ---
+work_width: 640          # photos are resized to this width before measuring
+cell_size: 16            # side of one measurement cell, in pixels at work_width
+
+# --- Measurements ---
+lightness_weight: 0.5    # below 1 makes brightness count less than colour, so shadows matter less
+texture_scale: 0.12      # brightness variation inside a cell that counts as fully rough
+gradient_scale: 0.5      # edge strength that counts as fully rough
+edge_scale: 0.25         # share of edge pixels in a cell that counts as fully rough
+canny_low: 50
+canny_high: 150
+
+# --- Finding the ground ---
+ground_prior: none       # "none": the most common colours are ground (top-down photos)
+                         # "bottom": colours in the bottom strip are ground (rover's-eye photos)
+n_clusters: 5            # number of colour groups
+ground_min_frac: 0.25    # with "none": a colour group this large is also treated as ground
+bottom_strip_frac: 0.2   # with "bottom": height of the strip trusted to be ground
+bottom_cluster_share: 0.15  # with "bottom": share of the strip a colour group needs to count as ground
+
+# --- Finding objects ---
+non_ground_distance: 24.0   # colour difference from ground above which a cell may be an object
+min_object_frac: 0.008      # smallest object, as a share of the image
+min_object_solidity: 0.5    # 1.0 = solid blob; lower accepts more ragged shapes
+object_gap_cells: 2         # gaps up to about twice this many cells inside an object are filled; 0 turns it off
+
+# --- Flat vs rocky ---
+rocky_threshold: 0.5     # roughness (0..1) above which ground is called rocky

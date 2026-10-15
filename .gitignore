@@ -11,3 +11,15 @@ _autosave-*
 # KiCad cache/lock files
 fp-info-cache
 *.lck
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+
+# Terrain classifier output
+out/
+
+# Downloaded public datasets (large, and not ours to redistribute)
+data/terrain/rugd/

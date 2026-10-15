@@ -1,0 +1,5 @@
+opencv-python
+numpy
+pyyaml
+scikit-learn
+pytest
