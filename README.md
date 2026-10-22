@@ -51,3 +51,5 @@ Do not develop directly on `main`.
 
 Initial software architecture and project setup.
 
+A first terrain classifier (flat / rocky / non-ground from a single photo) is in `src/argo_perception`. It has hand-set rules and an optional model trained on the public RUGD dataset; neither has been checked on photos of our own course. See `src/argo_perception/README.md`.
+
