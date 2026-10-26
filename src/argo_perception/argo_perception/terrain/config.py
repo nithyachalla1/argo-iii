@@ -31,11 +31,15 @@ class TerrainConfig:
 
     rocky_threshold: float = 0.5
 
+    non_ground_threshold: float = 0.4
+
     def __post_init__(self):
         if self.ground_prior not in GROUND_PRIORS:
             raise ValueError(f"ground_prior must be one of {GROUND_PRIORS}, got {self.ground_prior!r}")
         if self.work_width < self.cell_size or self.cell_size < 2:
             raise ValueError("work_width must be at least cell_size, and cell_size at least 2")
+        if not 0.0 < self.non_ground_threshold <= 1.0:
+            raise ValueError(f"non_ground_threshold must be above 0 and at most 1, got {self.non_ground_threshold}")
 
 
 def load_config(path) -> TerrainConfig:

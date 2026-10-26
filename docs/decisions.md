@@ -83,3 +83,63 @@ The hand-set rules miss the targets by a wide margin on this data. Two causes ac
 On RUGD the combination scores lower: it nearly doubles the ground wrongly blocked and removes only about an eighth of the missed non-ground. Most of the extra blocking is grass and other ground that differs in colour from the bottom of the photo. The benefit is on objects RUGD does not contain, and that has been seen on one photo, not measured. The combination has not been scored on the RUGD test videos.
 
 **When to use it.** Where driving into an unfamiliar object is worse than taking a detour. Measure it on our own course photos before making it the default.
+
+## Terrain model: context measurements and a non-ground threshold
+
+**Decision.** The trained model gets 14 more measurements per cell, and a cell is labelled `non_ground` once the model gives it a 40% chance or more (`non_ground_threshold: 0.4` in `config/terrain_classifier.yaml`), instead of only when non-ground is its top guess. `models/terrain_rugd.joblib` was retrained with them on the same 12 training videos.
+
+**Why.** The aim was to find more objects, including objects unlike anything in RUGD, without blocking as much ground as `--combine` does.
+- The new measurements say how much a cell stands out from what is around it (9 and 21 cells across) and from the cells beneath it. An object differs from the ground it stands on whatever it is, so this does not depend on having seen the object before.
+- The threshold is the dial between missed objects and blocked ground. Lowering it costs less blocked ground than `--combine` for the same gain in objects found.
+
+**How "objects it has not seen" was measured.** A copy of the model was trained with vehicle, pole, container, sign, picnic table, person, bicycle, fence, log and rock left out of the training labels, then asked to find those objects in the validation videos. Share of their 16-pixel cells labelled `non_ground`:
+
+| Measurements | Ground blocked | Unseen objects found |
+|---|---|---|
+| Old, threshold 0.4 | 3.5% | 56% |
+| New, threshold 0.4 | 3.6% | 63% |
+
+**Scores (2026-10-24, `ground_prior: bottom`).** Pixel shares; overlap is intersection-over-union.
+
+| Measure | Old model | Old `--combine` | New model |
+|---|---|---|---|
+| Validation: ground blocked | 4.8% | 8.9% | 5.6% |
+| Validation: objects missed | 4.0% | 3.5% | 3.4% |
+| Test: ground blocked | 4.1% | 5.9% | 4.7% |
+| Test: objects missed | 13.2% | 11.4% | 12.1% |
+| Test: ground overlap | 0.796 | 0.800 | 0.803 |
+| Test: non-ground overlap | 0.845 | 0.853 | 0.853 |
+| Test: flat vs rocky correct | 81% | 80% | 81% |
+| Time per photo | 23 ms | 36 ms | 23 ms |
+
+The test videos were scored once, after the choices above were made on the validation videos. Validation thresholds: 0.35 gives 6.3% blocked and 3.1% missed, 0.5 gives 4.6% and 4.0%.
+
+**What it costs.** Against the old model alone, slightly more ground is blocked (0.6 points on test) for 1.1 points fewer missed objects. On test, `--combine` still misses fewer objects (11.4% against 12.1%) but blocks more ground (5.9% against 4.7%).
+
+**Tried and not kept.**
+- Pasting cut-out and made-up objects in random colours onto training photos. It helped a little with the old measurements and not at all once the context measurements were added.
+- The hand-set rules' colour distance and object outline as model inputs. No gain.
+- More cells per training photo (600 instead of 250). Found fewer unseen objects.
+
+**Known limits.** About one in eight object pixels on the test videos is still labelled ground. The unseen-object check uses RUGD objects; something brightly coloured or man-made on our course has not been measured. A model file from before this change will not load; retrain with `scripts/train_terrain.py`.
+
+## Costmap: top-down, in metres, from one photo
+
+**Decision.** `build_costmap` (`terrain/costmap.py`) turns the label image into a top-down grid of the ground in front of the rover, with graded costs in the ROS nav2 convention: 0 flat, 60 rocky, a buffer of 1 to 252 that falls off with distance from obstacles, 253 within the rover's radius of an obstacle, 254 non-ground, and 255 unknown. Settings are in `config/costmap.yaml`. The existing `to_occupancy_grid` is unchanged.
+
+**Why top-down.** A grid laid over the photo gives far-away squares that cover metres of ground and near ones that cover centimetres, so distances and the buffer around obstacles mean nothing. In a top-down grid every cell is the same patch of ground (10 cm by default), which is what a planner and the Navigation costmaps in `docs/architecture.md` expect.
+
+**How it works.** The ground in front of the rover is assumed flat. Each cell is looked up at 4 by 4 points in the label image through a pinhole camera model, using the camera's height, downward tilt and side-to-side field of view.
+- A cell is blocked when more than 40% of the points it shows are non-ground, the same cut-off as `to_occupancy_grid`.
+- A cell whose points are all outside the photo is unknown. That covers the ground under and beside the camera, and anything past the edges of the photo.
+- The lookup tables are built once per photo size, so a costmap takes about 0.2 ms on top of classification.
+
+**Example.** Costmaps of three RUGD validation photos (each square is 1 m; blue triangle is the rover; green free, yellow to red near an obstacle, dark red blocked, grey not visible). Left: camera values close to RUGD's. Right: the placeholder values.
+
+![Costmaps of three RUGD photos with two sets of camera values](images/costmap_examples.png)
+
+**Known limits.**
+- **The camera numbers are placeholders** (30 cm high, tilted 20° down, 70° field of view) until the camera and mount in `docs/hardware_dependencies.md` are decided. Wrong values make the map wrong, not slightly off. On RUGD photos, which were taken by a camera about 60 cm high and nearly level, the placeholders put trees 1 m ahead and the whole map came out blocked. With 60 cm and 3° it looked right: trees on the left of the photo were blocked on the left of the map, and grass ahead was free.
+- **Flat ground is assumed.** An object standing up is projected as a smear stretching away behind its base. That smear is marked blocked. This errs on the safe side, and the ground behind an object is hidden anyway. Slopes stretch or squash distances.
+- **One photo at a time.** Nothing is remembered between frames, and nothing behind or beside the camera's view is known.
+- **Stereo depth** from the cameras in `docs/interfaces.md` would remove the flat-ground assumption.

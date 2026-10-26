@@ -1,0 +1,22 @@
+# Settings for the top-down costmap built from the terrain labels.
+# The ground in front of the rover is assumed flat. See docs/decisions.md.
+
+# --- Camera (PLACEHOLDERS until the camera and its mount are decided) ---
+camera_height_m: 0.30      # lens height above the ground
+camera_pitch_deg: 20.0     # downward tilt; 0 is level
+horizontal_fov_deg: 70.0   # side-to-side field of view of the photo
+
+# --- Grid ---
+resolution_m: 0.10         # side of one cell
+forward_m: 4.0             # how far ahead the map reaches, from the point under the camera
+side_m: 2.0                # how far the map reaches to each side
+
+# --- Costs (0 free .. 252; 253 next to an obstacle, 254 blocked, 255 unknown) ---
+flat_cost: 0
+rocky_cost: 60
+blocked_ratio: 0.4         # a cell is blocked when more than this share of what it shows is non-ground
+
+# --- Buffer around obstacles ---
+rover_radius_m: 0.25       # PLACEHOLDER; cells this close to an obstacle get 253 (the rover's centre must not enter)
+inflation_radius_m: 0.6    # cells up to this far from an obstacle get extra cost
+inflation_decay: 5.0       # how fast that extra cost falls off with distance; higher falls faster

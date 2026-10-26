@@ -8,7 +8,7 @@ import numpy as np
 from sklearn.ensemble import HistGradientBoostingClassifier
 
 from .features import FEATURE_NAMES
-from .labels import IGNORE, NAMES
+from .labels import FLAT, IGNORE, NAMES, NON_GROUND, ROCKY
 
 
 def cell_truth(mask: np.ndarray, rows: int, cols: int, min_share: float = 0.7) -> np.ndarray:
@@ -31,9 +31,19 @@ class TerrainModel:
         trees.fit(samples, labels)
         return cls(trees)
 
-    def predict_cells(self, features: np.ndarray) -> np.ndarray:
+    def predict_cells(self, features: np.ndarray, non_ground_threshold: float = 0.5) -> np.ndarray:
+        """Label each cell; NON_GROUND wherever the model gives it at least non_ground_threshold.
+
+        Below 0.5 this finds more objects at the cost of blocking more ground.
+        """
         rows, cols, count = features.shape
-        return self.trees.predict(features.reshape(-1, count)).astype(np.uint8).reshape(rows, cols)
+        chances = self.trees.predict_proba(features.reshape(-1, count))
+        # Columns in label order, with zero for a label the model never saw in training.
+        full = np.zeros((len(chances), len(NAMES)), dtype=chances.dtype)
+        full[:, self.trees.classes_] = chances
+        labels = np.where(full[:, FLAT] >= full[:, ROCKY], FLAT, ROCKY)
+        labels[full[:, NON_GROUND] >= non_ground_threshold] = NON_GROUND
+        return labels.astype(np.uint8).reshape(rows, cols)
 
     def save(self, path) -> None:
         Path(path).parent.mkdir(parents=True, exist_ok=True)
