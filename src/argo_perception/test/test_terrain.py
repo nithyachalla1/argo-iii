@@ -189,6 +189,12 @@ def test_confusion_rejects_mismatched_sizes():
         confusion(np.zeros((2, 2), dtype=np.uint8), np.zeros((2, 3), dtype=np.uint8))
 
 
+@pytest.mark.parametrize("threshold", [0.0, 1.5])
+def test_non_ground_threshold_out_of_range_is_rejected(threshold):
+    with pytest.raises(ValueError):
+        TerrainConfig(non_ground_threshold=threshold)
+
+
 def test_config_is_immutable():
     with pytest.raises(dataclasses.FrozenInstanceError):
         TerrainConfig().cell_size = 8
@@ -287,11 +293,55 @@ def test_model_trained_with_other_measurements_is_rejected(tmp_path):
         TerrainModel.load(path)
 
 
+class _FixedChances:
+    """Stands in for the trees: gives every cell the same chances."""
+
+    def __init__(self, classes, chances):
+        self.classes_ = np.array(classes)
+        self.chances = np.array(chances, dtype=float)
+
+    def predict_proba(self, samples):
+        return np.tile(self.chances, (len(samples), 1))
+
+
+@pytest.mark.parametrize(
+    "classes, chances, threshold, expected",
+    [
+        ([FLAT, ROCKY, NON_GROUND], [0.5, 0.1, 0.4], 0.5, FLAT),
+        ([FLAT, ROCKY, NON_GROUND], [0.5, 0.1, 0.4], 0.4, NON_GROUND),
+        ([FLAT, ROCKY, NON_GROUND], [0.2, 0.45, 0.35], 0.4, ROCKY),
+        ([FLAT, NON_GROUND], [0.7, 0.3], 0.3, NON_GROUND),
+        ([FLAT, NON_GROUND], [0.7, 0.3], 0.5, FLAT),
+    ],
+)
+def test_non_ground_threshold_decides_objects(classes, chances, threshold, expected):
+    from argo_perception.terrain.learned import TerrainModel
+
+    model = TerrainModel(_FixedChances(classes, chances))
+    labels = model.predict_cells(np.zeros((2, 3, 4), dtype=np.float32), threshold)
+    assert labels.shape == (2, 3)
+    assert np.all(labels == expected)
+
+
+def test_object_stands_out_in_context_measurements(flat_scene):
+    from argo_perception.terrain.features import FEATURE_NAMES, learned_features
+
+    cfg = TerrainConfig()
+    image = flat_scene.copy()
+    h, w = image.shape[:2]
+    image[h // 3 : h // 2, w // 3 : w // 2] = (200, 60, 230)
+    features = learned_features(prepare(image, cfg), cfg)
+    stand_out = np.abs(features[..., FEATURE_NAMES.index("green_red_vs_area9")])
+    rows, cols = stand_out.shape
+    inside = stand_out[rows // 3 + 1 : rows // 2 - 1, cols // 3 + 1 : cols // 2 - 1]
+    assert inside.min() > 4 * np.median(stand_out)
+
+
 # --- model and rules combined ---
 
 
 class _SeesOnlyFlat:
-    def predict_cells(self, features):
+    def predict_cells(self, features, non_ground_threshold=0.5):
         return np.full(features.shape[:2], FLAT, dtype=np.uint8)
 
 

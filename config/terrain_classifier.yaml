@@ -29,3 +29,7 @@ object_gap_cells: 2         # gaps up to about twice this many cells inside an o
 
 # --- Flat vs rocky ---
 rocky_threshold: 0.5     # roughness (0..1) above which ground is called rocky
+
+# --- Trained model only (--model) ---
+non_ground_threshold: 0.4  # a cell is non-ground once the model gives it this chance or more.
+                           # Lower finds more objects but blocks more ground; higher blocks less ground but misses more objects

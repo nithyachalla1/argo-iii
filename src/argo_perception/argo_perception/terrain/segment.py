@@ -55,7 +55,7 @@ def classify_terrain(
     if model is None:
         cell_labels, roughness, distance = _rule_labels(work, cfg)
     else:
-        cell_labels, roughness, distance = model.predict_cells(learned_features(work, cfg)), None, None
+        cell_labels, roughness, distance = model.predict_cells(learned_features(work, cfg), cfg.non_ground_threshold), None, None
         if combine:
             rule_labels, roughness, distance = _rule_labels(work, cfg)
             cell_labels = np.where(rule_labels == NON_GROUND, NON_GROUND, cell_labels).astype(np.uint8)

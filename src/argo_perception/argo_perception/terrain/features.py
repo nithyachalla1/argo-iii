@@ -71,11 +71,33 @@ _LOCAL = [
     "lightness_spread", "green_red_spread", "blue_yellow_spread",
     "texture", "edge_strength", "edge_strength_x", "edge_strength_y", "edge_density",
 ]
+_COLOUR = ["lightness", "green_red", "blue_yellow"]
+_CONTEXT_SIZES = (9, 21)
 FEATURE_NAMES = (
     _LOCAL
     + [f"{name}_nearby" for name in _LOCAL]
     + ["lightness_vs_bottom", "green_red_vs_bottom", "blue_yellow_vs_bottom", "height_in_photo"]
+    + [f"{name}_vs_area{size}" for size in _CONTEXT_SIZES for name in _COLOUR + ["texture"]]
+    + [f"{name}_vs_below" for name in _COLOUR]
+    + [f"{name}_vs_column_bottom" for name in _COLOUR]
 )
+
+
+def _context(lab_mean: np.ndarray, texture: np.ndarray) -> np.ndarray:
+    """How much each cell stands out from what is around and beneath it.
+
+    An object differs from the ground it stands on even when it is unlike anything
+    in the training photos, so these help the model find objects it has not seen.
+    """
+    parts = []
+    for size in _CONTEXT_SIZES:
+        parts.append(lab_mean - cv2.blur(lab_mean, (size, size)))
+        parts.append((texture - cv2.blur(texture, (size, size)))[..., None])
+    rows = lab_mean.shape[0]
+    below = np.concatenate([lab_mean[2:], np.repeat(lab_mean[-1:], min(2, rows), axis=0)])
+    parts.append(lab_mean - below)
+    parts.append(lab_mean - lab_mean[-4:].mean(axis=0, keepdims=True))
+    return np.dstack(parts)
 
 
 def learned_features(bgr: np.ndarray, cfg: TerrainConfig) -> np.ndarray:
@@ -90,4 +112,5 @@ def learned_features(bgr: np.ndarray, cfg: TerrainConfig) -> np.ndarray:
     strip_rows = max(1, round(rows * cfg.bottom_strip_frac))
     vs_bottom = m["lab_mean"] - m["lab_mean"][-strip_rows:].mean(axis=(0, 1))
     height = np.repeat(np.linspace(0.0, 1.0, rows, dtype=np.float32)[:, None], cols, axis=1)
-    return np.dstack([local, nearby, vs_bottom, height]).astype(np.float32)
+    context = _context(m["lab_mean"], m["texture"])
+    return np.dstack([local, nearby, vs_bottom, height, context]).astype(np.float32)
