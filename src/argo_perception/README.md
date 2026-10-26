@@ -70,6 +70,32 @@ grid = to_occupancy_grid(result.labels, cell_size=25, rocky_blocked=True)
 
 `grid` holds 1 for blocked cells and 0 for free cells, indexed `[row, col]`. It can be passed directly to a grid route planner such as `a_star_search` on the `candidate_map` branch.
 
+### Top-down costmap
+
+`build_costmap` projects the labels onto the ground in front of the rover and returns a grid in metres (10 cm cells, 4 m ahead and 2 m to each side by default). Costs follow the ROS nav2 convention:
+
+| Cost | Meaning |
+|---|---|
+| 0 | flat |
+| 60 | rocky |
+| 1 to 252 | close to an obstacle; higher is closer |
+| 253 | so close to an obstacle that the rover's centre must not go there |
+| 254 | blocked (non-ground) |
+| 255 | unknown: not visible in the photo |
+
+```python
+from argo_perception.terrain import build_costmap, costmap_image, load_costmap_config
+
+costmap = build_costmap(result.labels, load_costmap_config("config/costmap.yaml"))
+costmap.costs                 # uint8 array: row 0 is the far edge, the last row is nearest the rover
+costmap.cell_centre(39, 20)   # (metres ahead, metres to the left) of a cell
+cv2.imwrite("costmap.png", costmap_image(costmap))
+```
+
+From the command line, add `--costmap` to `scripts/classify_terrain.py`. It also saves `<name>_costmap.png` and `<name>_costmap.npy`.
+
+The camera height, tilt and field of view in `config/costmap.yaml` are placeholders. Distances are only right once they match the real camera. With wrong values the map is badly wrong, not slightly off: see `docs/decisions.md`.
+
 ### Settings
 
 All thresholds are in `config/terrain_classifier.yaml`, with a comment on each.

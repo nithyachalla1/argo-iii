@@ -122,3 +122,24 @@ The test videos were scored once, after the choices above were made on the valid
 - More cells per training photo (600 instead of 250). Found fewer unseen objects.
 
 **Known limits.** About one in eight object pixels on the test videos is still labelled ground. The unseen-object check uses RUGD objects; something brightly coloured or man-made on our course has not been measured. A model file from before this change will not load; retrain with `scripts/train_terrain.py`.
+
+## Costmap: top-down, in metres, from one photo
+
+**Decision.** `build_costmap` (`terrain/costmap.py`) turns the label image into a top-down grid of the ground in front of the rover, with graded costs in the ROS nav2 convention: 0 flat, 60 rocky, a buffer of 1 to 252 that falls off with distance from obstacles, 253 within the rover's radius of an obstacle, 254 non-ground, and 255 unknown. Settings are in `config/costmap.yaml`. The existing `to_occupancy_grid` is unchanged.
+
+**Why top-down.** A grid laid over the photo gives far-away squares that cover metres of ground and near ones that cover centimetres, so distances and the buffer around obstacles mean nothing. In a top-down grid every cell is the same patch of ground (10 cm by default), which is what a planner and the Navigation costmaps in `docs/architecture.md` expect.
+
+**How it works.** The ground in front of the rover is assumed flat. Each cell is looked up at 4 by 4 points in the label image through a pinhole camera model, using the camera's height, downward tilt and side-to-side field of view.
+- A cell is blocked when more than 40% of the points it shows are non-ground, the same cut-off as `to_occupancy_grid`.
+- A cell whose points are all outside the photo is unknown. That covers the ground under and beside the camera, and anything past the edges of the photo.
+- The lookup tables are built once per photo size, so a costmap takes about 0.2 ms on top of classification.
+
+**Example.** Costmaps of three RUGD validation photos (each square is 1 m; blue triangle is the rover; green free, yellow to red near an obstacle, dark red blocked, grey not visible). Left: camera values close to RUGD's. Right: the placeholder values.
+
+![Costmaps of three RUGD photos with two sets of camera values](images/costmap_examples.png)
+
+**Known limits.**
+- **The camera numbers are placeholders** (30 cm high, tilted 20° down, 70° field of view) until the camera and mount in `docs/hardware_dependencies.md` are decided. Wrong values make the map wrong, not slightly off. On RUGD photos, which were taken by a camera about 60 cm high and nearly level, the placeholders put trees 1 m ahead and the whole map came out blocked. With 60 cm and 3° it looked right: trees on the left of the photo were blocked on the left of the map, and grass ahead was free.
+- **Flat ground is assumed.** An object standing up is projected as a smear stretching away behind its base. That smear is marked blocked. This errs on the safe side, and the ground behind an object is hidden anyway. Slopes stretch or squash distances.
+- **One photo at a time.** Nothing is remembered between frames, and nothing behind or beside the camera's view is known.
+- **Stereo depth** from the cameras in `docs/interfaces.md` would remove the flat-ground assumption.

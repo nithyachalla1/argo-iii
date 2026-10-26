@@ -357,3 +357,109 @@ def test_combine_adds_objects_the_model_missed(mixed_scene):
 def test_combine_without_a_model_is_rejected(flat_scene):
     with pytest.raises(ValueError):
         classify_terrain(flat_scene, combine=True)
+
+
+# --- top-down costmap ---
+
+
+def _costmap_labels(fill):
+    return np.full((480, 640), fill, dtype=np.uint8)
+
+
+def test_costmap_yaml_file_matches_built_in_defaults():
+    from argo_perception.terrain import CostmapConfig, load_costmap_config
+
+    assert load_costmap_config(REPO / "config" / "costmap.yaml") == CostmapConfig()
+
+
+@pytest.mark.parametrize(
+    "setting",
+    [
+        {"camera_height_m": 0},
+        {"horizontal_fov_deg": 180},
+        {"camera_pitch_deg": 90},
+        {"rover_radius_m": 1.0, "inflation_radius_m": 0.5},
+        {"rocky_cost": 253},
+        {"resolution_m": 0},
+    ],
+)
+def test_bad_costmap_settings_are_rejected(setting):
+    from argo_perception.terrain import CostmapConfig
+
+    with pytest.raises(ValueError):
+        CostmapConfig(**setting)
+
+
+def test_ground_straight_ahead_is_in_the_middle_column_and_nearer_is_lower():
+    from argo_perception.terrain import CostmapConfig
+    from argo_perception.terrain.costmap import ground_to_pixel
+
+    cfg = CostmapConfig()
+    u, v, valid = ground_to_pixel(np.array([1.0, 3.0]), np.array([0.0, 0.0]), (480, 640), cfg)
+    assert valid.all()
+    assert np.allclose(u, 320)
+    assert v[0] > v[1]
+    left_u, _, _ = ground_to_pixel(2.0, 0.5, (480, 640), cfg)
+    assert left_u < 320
+
+
+def test_ground_behind_the_camera_is_invalid_and_level_horizon_is_mid_image():
+    from argo_perception.terrain import CostmapConfig
+    from argo_perception.terrain.costmap import ground_to_pixel
+
+    _, _, behind = ground_to_pixel(-1.0, 0.0, (480, 640), CostmapConfig())
+    assert not behind
+    _, v, _ = ground_to_pixel(1e6, 0.0, (480, 640), CostmapConfig(camera_pitch_deg=0))
+    assert v == pytest.approx(240, abs=0.01)
+
+
+def test_cell_centre_of_nearest_middle_cell_is_just_ahead():
+    from argo_perception.terrain import CostmapConfig, build_costmap
+
+    cfg = CostmapConfig()
+    costmap = build_costmap(_costmap_labels(FLAT), cfg)
+    rows, cols = costmap.costs.shape
+    assert (rows, cols) == (40, 40)
+    x, y = costmap.cell_centre(rows - 1, cols // 2)
+    assert x == pytest.approx(cfg.resolution_m / 2)
+    assert abs(y) <= cfg.resolution_m / 2 + 1e-9
+    assert costmap.cell_centre(0, 0)[1] > 0  # column 0 is on the left
+
+
+def test_all_flat_photo_gives_free_ground_and_unknown_out_of_view():
+    from argo_perception.terrain import build_costmap
+    from argo_perception.terrain.costmap import FREE, UNKNOWN
+
+    costs = build_costmap(_costmap_labels(FLAT)).costs
+    assert set(np.unique(costs)) == {FREE, UNKNOWN}
+    assert costs[-1, 20] == UNKNOWN  # hidden under the camera
+    assert costs[-1, 0] == UNKNOWN  # beside the rover, outside the view
+    assert costs[0, 20] == FREE  # 4 m straight ahead
+    assert (costs == FREE).mean() > 0.5
+
+
+def test_all_rocky_photo_gives_rocky_cost():
+    from argo_perception.terrain import CostmapConfig, build_costmap
+    from argo_perception.terrain.costmap import UNKNOWN
+
+    costs = build_costmap(_costmap_labels(ROCKY)).costs
+    assert set(np.unique(costs)) == {CostmapConfig().rocky_cost, UNKNOWN}
+
+
+def test_object_ahead_is_blocked_with_a_buffer_around_it():
+    from argo_perception.terrain import build_costmap
+    from argo_perception.terrain.costmap import BLOCKED, FREE, NEAR_OBSTACLE, UNKNOWN
+
+    labels = _costmap_labels(FLAT)
+    labels[300:, 220:420] = NON_GROUND  # a box on the ground just ahead of the rover
+    costs = build_costmap(labels).costs
+    free_costs = build_costmap(_costmap_labels(FLAT)).costs
+
+    blocked_rows, blocked_cols = np.nonzero(costs == BLOCKED)
+    assert len(blocked_rows) > 0
+    assert blocked_rows.min() > 30  # near the rover
+    assert set(blocked_cols) <= set(range(16, 24))  # straight ahead
+    assert (costs == NEAR_OBSTACLE).any()
+    assert ((costs > FREE) & (costs < NEAR_OBSTACLE)).any()  # buffer falls off
+    assert np.all(costs[:10] == free_costs[:10])  # far away is untouched
+    assert np.all(costs[free_costs == UNKNOWN] == UNKNOWN)
