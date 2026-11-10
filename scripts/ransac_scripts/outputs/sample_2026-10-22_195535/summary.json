@@ -1,0 +1,36 @@
+{
+  "ground_plane": {
+    "a": -0.005999999999999999,
+    "b": 0.0,
+    "c": 0.0019999999999999996,
+    "equation": "z = a*x + b*y + c"
+  },
+  "num_points": 6,
+  "num_ground": 4,
+  "num_obstacle_clusters": 1,
+  "num_stray": 0,
+  "occupied_cells": 2,
+  "grid_shape_rows_cols": [
+    50,
+    60
+  ],
+  "scores": {
+    "accuracy": 1.0,
+    "ground_called_obstacle": 0,
+    "obstacle_called_ground": 0
+  },
+  "config": {
+    "camera_height_m": 0.4,
+    "camera_pitch_deg": 0.0,
+    "ground_threshold_m": 0.1,
+    "ransac_threshold_m": 0.05,
+    "ransac_iterations": 100,
+    "max_ground_slope_deg": 10.0,
+    "random_seed": 0,
+    "cluster_eps_m": 0.25,
+    "cluster_min_points": 2,
+    "map_resolution_m": 0.1,
+    "map_width_m": 6.0,
+    "map_forward_m": 5.0
+  }
+}

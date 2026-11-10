@@ -1,0 +1,36 @@
+{
+  "ground_plane": {
+    "a": 0.019228328151854948,
+    "b": 0.00018717758479763421,
+    "c": 0.004245744473753789,
+    "equation": "z = a*x + b*y + c"
+  },
+  "num_points": 2075,
+  "num_ground": 1648,
+  "num_obstacle_clusters": 2,
+  "num_stray": 15,
+  "occupied_cells": 24,
+  "grid_shape_rows_cols": [
+    50,
+    60
+  ],
+  "scores": {
+    "accuracy": 0.9575903614457831,
+    "ground_called_obstacle": 0,
+    "obstacle_called_ground": 88
+  },
+  "config": {
+    "camera_height_m": 0.4,
+    "camera_pitch_deg": 0.0,
+    "ground_threshold_m": 0.1,
+    "ransac_threshold_m": 0.05,
+    "ransac_iterations": 100,
+    "max_ground_slope_deg": 10.0,
+    "random_seed": 0,
+    "cluster_eps_m": 0.25,
+    "cluster_min_points": 2,
+    "map_resolution_m": 0.1,
+    "map_width_m": 6.0,
+    "map_forward_m": 5.0
+  }
+}
