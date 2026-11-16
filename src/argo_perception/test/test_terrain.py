@@ -607,3 +607,22 @@ def test_rellis_name_has_one_underscore_so_groups_by_sequence():
     spec.loader.exec_module(module)
     name = module.name_of("00000/pylon_camera_node/frame000308-1581624683_550.jpg")
     assert name == "00000_frame000308" and name.rsplit("_", 1)[0] == "00000"
+
+
+# --- GOOSE label conversion ---
+
+
+def test_goose_ids_map_to_our_labels():
+    from argo_perception.terrain.goose import goose_to_labels
+
+    # low_grass, gravel, car, sky, snow, undefined, soil, cobble
+    ids = np.array([[50, 24, 12, 53, 2, 0, 31, 3]], dtype=np.uint8)
+    labels, unknown = goose_to_labels(ids)
+    assert labels.tolist() == [[FLAT, ROCKY, NON_GROUND, NON_GROUND, IGNORE, IGNORE, FLAT, ROCKY]]
+    assert unknown == 0
+
+
+def test_goose_covers_every_id_in_its_mapping_file():
+    from argo_perception.terrain.goose import GOOSE_CLASSES
+
+    assert sorted(GOOSE_CLASSES) == list(range(64))

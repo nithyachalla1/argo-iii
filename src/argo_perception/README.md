@@ -87,7 +87,7 @@ To measure a threshold on labelled photos, in any folder laid out as in `data/te
 .venv/bin/python scripts/evaluate_confidence.py --data path/to/data --split test --thresholds 0.5 0.7 0.9
 ```
 
-It prints one table per group of photos (the name before the last underscore). Results for RUGD are in `docs/decisions.md`.
+It prints one table per group of photos (the name before the last underscore). Results for RUGD and for GOOSE, an unfamiliar dataset, are in `docs/decisions.md`. `scripts/prepare_goose.py` and `scripts/prepare_rellis.py` convert those datasets into the layout above.
 
 ### Top-down costmap
 

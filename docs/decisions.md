@@ -177,3 +177,19 @@ The test videos were scored once, after the choices above were made on the valid
 
 
 **Unfamiliar environments within RUGD (2026-11-15).** A copy of the model was trained on the trail videos only (no park-2, no village; 802 photos) and scored on park-8, park-1 and the creek, which it had never seen. Compared with the normal model on the same photos, it was 0.5 points less accurate with no threshold (85.1% against 85.6%), and the effect of each threshold was nearly the same: at 0.7, 90.3% labelled and 88.4% correct (normal model 91.0% and 88.8%), at 0.9, 75.4% and 93.8% (76.8% and 93.9%). Per place, the creek stays the hard one (74.5% correct with no threshold, 7.5% of objects still labelled ground at 0.9) and the parks stay easy (94%+). The conclusion is about RUGD, not about the world: its trails, parks and creek are all green woodland seen from the same robot, so this is a mild shift. It says the thresholds behave the same when a scene type is left out, not how they behave on a different climate, surface or camera. That needs photos from somewhere else (our course, or a desert, snow or gravel-pit dataset).
+
+**Unfamiliar environments: GOOSE (2026-11-16).** GOOSE (goose-dataset.de, CC BY-SA) is German off-road and road driving filmed through a car windshield: a different country, camera, height and mix of scenes from RUGD. The model never saw it. `scripts/prepare_goose.py` converted its validation set (962 photos, 8 drives; every second photo scored, 481), mapping low and high grass, soil, asphalt and paths to flat, gravel and cobble to rocky, and everything built or standing to non-ground. Snow, leaves, moss, crops, rail track, tree roots and bridges are not scored.
+
+| Threshold | Pixels labelled | Of those, correct | Removed were wrong | Objects labelled ground | Objects flagged unknown |
+|---|---|---|---|---|---|
+| off | 100% | 83.9% | - | 8.8% | 0% |
+| 0.5 | 97.8% | 84.7% | 50.9% | 8.5% | 1.4% |
+| 0.7 | 87.4% | 88.0% | 44.3% | 6.0% | 6.2% |
+| 0.9 | 64.8% | 93.7% | 34.2% | 1.9% | 15.1% |
+
+- **Accuracy fell, the thresholds still work.** With no threshold the model is 83.9% correct here against 93% on RUGD validation, but each threshold has the same kind of effect as on RUGD. At 0.9, objects labelled ground fall from 8.8% to 1.9%.
+- **More of the image goes to unknown in unfamiliar scenes:** 0.7 sends 12.6% of pixels to unknown (RUGD validation: 6.9%), and 0.9 sends 35% (RUGD: 21%). Unknown is rising where the model is less sure, which is the point, but a planner that refuses unknown cells will see less free ground here.
+- **The hardest drive** is the winter hills drive (2022-12-07): 76.2% correct with no threshold, 13.0% of objects labelled ground. The easiest are the sunny and January drives (90.5% and 89.8%). The rain drive is not worse than the others on accuracy (88.1%), but 11.1% of its objects are labelled ground, and 3.2% still are at 0.9.
+- **Where it is still confidently wrong:** in the preview we checked by eye, the model calls a gravel verge flat with high confidence, and the cars, pedestrian and kerbs get low confidence. Flat versus rocky is the weak part of the model on this data; the confidence is more useful for objects.
+
+**Limits.** Windshield height is not rover height, and most scenes are roads, so GOOSE shows how the confidence behaves under a camera and place shift, not on a rover on a course. Our own photos are still the final test. The GOOSE class mapping is ours (see `terrain/goose.py`) and the unscored classes are a judgement call.
