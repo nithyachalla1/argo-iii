@@ -33,3 +33,6 @@ rocky_threshold: 0.5     # roughness (0..1) above which ground is called rocky
 # --- Trained model only (--model) ---
 non_ground_threshold: 0.4  # a cell is non-ground once the model gives it this chance or more.
                            # Lower finds more objects but blocks more ground; higher blocks less ground but misses more objects
+min_confidence: 0.0        # a cell whose chance for its label is under this is labelled "unknown" instead of guessed.
+                           # 0 turns it off. Higher flags more cells as unknown: fewer wrong labels, less ground labelled.
+                           # See docs/decisions.md for 0.5, 0.7 and 0.9 measured on RUGD

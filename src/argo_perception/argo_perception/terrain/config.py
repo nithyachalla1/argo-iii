@@ -32,6 +32,7 @@ class TerrainConfig:
     rocky_threshold: float = 0.5
 
     non_ground_threshold: float = 0.4
+    min_confidence: float = 0.0
 
     def __post_init__(self):
         if self.ground_prior not in GROUND_PRIORS:
@@ -40,6 +41,8 @@ class TerrainConfig:
             raise ValueError("work_width must be at least cell_size, and cell_size at least 2")
         if not 0.0 < self.non_ground_threshold <= 1.0:
             raise ValueError(f"non_ground_threshold must be above 0 and at most 1, got {self.non_ground_threshold}")
+        if not 0.0 <= self.min_confidence <= 1.0:
+            raise ValueError(f"min_confidence must be between 0 and 1, got {self.min_confidence}")
 
 
 def load_config(path) -> TerrainConfig:

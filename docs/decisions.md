@@ -143,3 +143,37 @@ The test videos were scored once, after the choices above were made on the valid
 - **Flat ground is assumed.** An object standing up is projected as a smear stretching away behind its base. That smear is marked blocked. This errs on the safe side, and the ground behind an object is hidden anyway. Slopes stretch or squash distances.
 - **One photo at a time.** Nothing is remembered between frames, and nothing behind or beside the camera's view is known.
 - **Stereo depth** from the cameras in `docs/interfaces.md` would remove the flat-ground assumption.
+
+## Terrain model: confidence and an unknown label
+
+**Decision.** With the trained model, every cell now has a confidence: the model's own chance (0 to 1) for the label it gave. A cell whose confidence is under `min_confidence` (`config/terrain_classifier.yaml`, `--min-confidence` on the command line) is labelled `unknown` (value 3) instead of being forced into flat, rocky or non-ground. `min_confidence` is **0 (off) until we pick a value**; the measurements below suggest 0.7. The hand-set rules have no confidence and never say unknown.
+
+**What unknown does downstream.**
+- Costmap: a cell that is mostly unknown (`unknown_ratio`, 0.5) gets cost 255, "no information", the same as ground out of view. Otherwise unknown pixels are left out of the cost average. The planner, not the classifier, then decides whether it may cross unknown cells (nav2's `allow_unknown`).
+- `to_occupancy_grid`: unknown counts as blocked unless `unknown_blocked=False`.
+- With `--combine`, anything the rules call an object stays non-ground (confidence 1.0) and is never unknown.
+
+**How it was measured** (`scripts/evaluate_confidence.py`, 2026-11-15). Every pixel under a threshold is re-labelled unknown and the rest scored against RUGD labels. Test is the held-out set of videos (every second photo, 962 photos); validation is every second photo too. "Removed were wrong" is how often a forced guess would have been wrong on the pixels sent to unknown.
+
+| Split | Threshold | Pixels labelled | Of those, correct | Removed were wrong | Objects labelled ground | Objects flagged unknown |
+|---|---|---|---|---|---|---|
+| Val | off | 100% | 93.1% | - | 3.2% | 0% |
+| Val | 0.5 | 98.8% | 93.8% | 56.7% | 3.1% | 0.7% |
+| Val | 0.7 | 93.1% | 95.7% | 41.5% | 2.1% | 3.3% |
+| Val | 0.9 | 79.2% | 97.9% | 25.0% | 0.8% | 8.6% |
+| Test | off | 100% | 85.2% | - | 12.1% | 0% |
+| Test | 0.5 | 98.3% | 85.7% | 42.7% | 11.8% | 1.6% |
+| Test | 0.7 | 90.7% | 88.5% | 47.1% | 9.6% | 6.7% |
+| Test | 0.9 | 75.4% | 93.8% | 41.0% | 4.6% | 17.1% |
+
+**Reading it.**
+- The confidence is informative: pixels sent to unknown are wrong 40 to 57% of the time if guessed, against 7 to 15% for the rest. The confidence has not been checked for calibration, so 0.9 does not mean "right 90% of the time"; the tables are the evidence.
+- **0.5 does almost nothing.** With three labels the top chance is at least 0.33, and the model is usually well above 0.5. Only 1 to 2% of pixels fall under it.
+- **0.7 is the middle:** about 7 to 9% of pixels become unknown, accuracy on the rest rises 2.5 to 3 points, and 20% fewer true objects are labelled ground on test.
+- **0.9 is the cautious setting:** a fifth to a quarter of the image is unknown, but objects labelled ground fall by more than half on both splits (3.2% to 0.8% on validation, 12.1% to 4.6% on test). Use it if a wrong "free" is much worse than a detour.
+- On the creek video (water and a rocky bed, the least familiar scene) 19% of object pixels are labelled ground with no threshold, and 7.8% still are at 0.9: the model is confidently wrong about some of them (water). Unknown reduces the error; it does not remove it.
+
+**Limits.** Measured on RUGD only. Results on unfamiliar environments (our own course, other datasets) are still to be done: `scripts/evaluate_confidence.py` runs on any data in the same folder layout and prints one table per group of photos. The costmap check is by eye on three photos, not scored.
+
+
+**Unfamiliar environments within RUGD (2026-11-15).** A copy of the model was trained on the trail videos only (no park-2, no village; 802 photos) and scored on park-8, park-1 and the creek, which it had never seen. Compared with the normal model on the same photos, it was 0.5 points less accurate with no threshold (85.1% against 85.6%), and the effect of each threshold was nearly the same: at 0.7, 90.3% labelled and 88.4% correct (normal model 91.0% and 88.8%), at 0.9, 75.4% and 93.8% (76.8% and 93.9%). Per place, the creek stays the hard one (74.5% correct with no threshold, 7.5% of objects still labelled ground at 0.9) and the parks stay easy (94%+). The conclusion is about RUGD, not about the world: its trails, parks and creek are all green woodland seen from the same robot, so this is a mild shift. It says the thresholds behave the same when a scene type is left out, not how they behave on a different climate, surface or camera. That needs photos from somewhere else (our course, or a desert, snow or gravel-pit dataset).

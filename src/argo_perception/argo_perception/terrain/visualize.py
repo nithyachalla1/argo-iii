@@ -2,7 +2,7 @@ import cv2
 import numpy as np
 
 from .costmap import BLOCKED, MAX_BUFFER, NEAR_OBSTACLE, UNKNOWN, Costmap
-from .labels import COLOURS_BGR, NAMES
+from .labels import COLOURS_BGR, PREDICTION_NAMES, UNKNOWN
 
 
 def _legend(out: np.ndarray, entries: list[tuple[str, tuple[int, int, int]]]) -> None:
@@ -23,7 +23,35 @@ def overlay(image: np.ndarray, labels: np.ndarray, alpha: float = 0.45) -> np.nd
     for label, colour in COLOURS_BGR.items():
         tint[labels == label] = colour
     out = cv2.addWeighted(tint, alpha, image, 1 - alpha, 0)
-    _legend(out, [(NAMES[label], colour) for label, colour in COLOURS_BGR.items()])
+    # unknown is listed only when the picture has some, so rules-only output keeps its three-entry legend
+    shown = [label for label in COLOURS_BGR if label != UNKNOWN or (labels == UNKNOWN).any()]
+    _legend(out, [(PREDICTION_NAMES[label], COLOURS_BGR[label]) for label in shown])
+    return out
+
+
+def confidence_image(image: np.ndarray, confidence: np.ndarray, alpha: float = 0.6) -> np.ndarray:
+    """Photo tinted by how sure the model is: dark purple is a guess, bright yellow is certain.
+
+    Uses one fixed 0..1 scale (not stretched to the photo), so two photos can be compared by eye.
+    A colour bar on the right edge marks 0, 0.5 and 1.
+    """
+    shade = np.clip(np.round(confidence * 255), 0, 255).astype(np.uint8)
+    tint = cv2.applyColorMap(shade, cv2.COLORMAP_VIRIDIS)
+    out = cv2.addWeighted(tint, alpha, image, 1 - alpha, 0)
+
+    scale = max(out.shape[1] / 640.0, 0.5)
+    bar_w, pad = int(16 * scale), int(8 * scale)
+    bar_h = min(out.shape[0] - 2 * pad, int(160 * scale))
+    left, top = out.shape[1] - pad - bar_w, pad
+    ramp = np.linspace(255, 0, bar_h, dtype=np.uint8)[:, None].repeat(bar_w, axis=1)
+    out[top : top + bar_h, left : left + bar_w] = cv2.applyColorMap(ramp, cv2.COLORMAP_VIRIDIS)
+    cv2.rectangle(out, (left, top), (left + bar_w, top + bar_h), (255, 255, 255), 1)
+    for value in (0.0, 0.5, 1.0):
+        y = int(round(top + (1 - value) * (bar_h - 1)))
+        origin = (left - int(34 * scale), min(max(y + 4, top + 10), top + bar_h))
+        text = f"{value:.1f}"
+        cv2.putText(out, text, origin, cv2.FONT_HERSHEY_SIMPLEX, 0.45 * scale, (0, 0, 0), max(3, int(3 * scale)), cv2.LINE_AA)
+        cv2.putText(out, text, origin, cv2.FONT_HERSHEY_SIMPLEX, 0.45 * scale, (255, 255, 255), max(1, int(scale)), cv2.LINE_AA)
     return out
 
 

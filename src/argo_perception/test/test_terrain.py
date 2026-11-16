@@ -9,6 +9,7 @@ from argo_perception.terrain import (
     IGNORE,
     NON_GROUND,
     ROCKY,
+    UNKNOWN,
     TerrainConfig,
     classify_terrain,
     load_config,
@@ -318,7 +319,7 @@ def test_non_ground_threshold_decides_objects(classes, chances, threshold, expec
     from argo_perception.terrain.learned import TerrainModel
 
     model = TerrainModel(_FixedChances(classes, chances))
-    labels = model.predict_cells(np.zeros((2, 3, 4), dtype=np.float32), threshold)
+    labels, _ = model.predict_cells(np.zeros((2, 3, 4), dtype=np.float32), threshold)
     assert labels.shape == (2, 3)
     assert np.all(labels == expected)
 
@@ -341,8 +342,9 @@ def test_object_stands_out_in_context_measurements(flat_scene):
 
 
 class _SeesOnlyFlat:
-    def predict_cells(self, features, non_ground_threshold=0.5):
-        return np.full(features.shape[:2], FLAT, dtype=np.uint8)
+    def predict_cells(self, features, non_ground_threshold=0.5, min_confidence=0.0):
+        shape = features.shape[:2]
+        return np.full(shape, FLAT, dtype=np.uint8), np.full(shape, 0.9, dtype=np.float32)
 
 
 def test_combine_adds_objects_the_model_missed(mixed_scene):
@@ -463,3 +465,116 @@ def test_object_ahead_is_blocked_with_a_buffer_around_it():
     assert ((costs > FREE) & (costs < NEAR_OBSTACLE)).any()  # buffer falls off
     assert np.all(costs[:10] == free_costs[:10])  # far away is untouched
     assert np.all(costs[free_costs == UNKNOWN] == UNKNOWN)
+
+
+# --- confidence and unknown ---
+
+
+def _fixed_model(chances, classes=(FLAT, ROCKY, NON_GROUND)):
+    from argo_perception.terrain.learned import TerrainModel
+
+    return TerrainModel(_FixedChances(classes, chances))
+
+
+@pytest.mark.parametrize(
+    "chances, threshold, min_confidence, label, confidence",
+    [
+        ([0.5, 0.1, 0.4], 0.5, 0.0, FLAT, 0.5),
+        ([0.5, 0.1, 0.4], 0.4, 0.0, NON_GROUND, 0.4),  # confidence is the chance of the label given
+        ([0.5, 0.1, 0.4], 0.5, 0.5, FLAT, 0.5),  # exactly at the limit is kept
+        ([0.5, 0.1, 0.4], 0.5, 0.7, UNKNOWN, 0.5),
+        ([0.4, 0.35, 0.25], 0.5, 0.5, UNKNOWN, 0.4),
+        ([0.05, 0.03, 0.92], 0.5, 0.9, NON_GROUND, 0.92),
+    ],
+)
+def test_low_confidence_cells_become_unknown(chances, threshold, min_confidence, label, confidence):
+    labels, got = _fixed_model(chances).predict_cells(np.zeros((2, 3, 4), dtype=np.float32), threshold, min_confidence)
+    assert np.all(labels == label)
+    assert np.allclose(got, confidence)
+
+
+def test_classify_reports_confidence_and_unknown_at_full_size(mixed_scene):
+    image, _ = mixed_scene
+    model = _fixed_model([0.5, 0.3, 0.2])
+    kept = classify_terrain(image, TerrainConfig(min_confidence=0.4), model)
+    assert kept.confidence.shape == image.shape[:2] and kept.confidence.dtype == np.float32
+    assert np.allclose(kept.confidence, 0.5) and np.all(kept.labels == FLAT)
+    unsure = classify_terrain(image, TerrainConfig(min_confidence=0.6), model)
+    assert np.all(unsure.labels == UNKNOWN)
+    assert np.allclose(unsure.confidence, 0.5)  # still reported
+
+
+def test_rules_give_no_confidence_and_never_unknown(mixed_scene):
+    image, _ = mixed_scene
+    result = classify_terrain(image, TerrainConfig(min_confidence=0.9))
+    assert result.confidence is None
+    assert not (result.labels == UNKNOWN).any()
+
+
+def test_combine_keeps_rule_objects_even_when_the_model_is_unsure(mixed_scene):
+    image, _ = mixed_scene
+    rules = classify_terrain(image).labels
+    result = classify_terrain(image, TerrainConfig(min_confidence=0.95), _fixed_model([0.5, 0.3, 0.2]), combine=True)
+    assert np.array_equal(result.labels == NON_GROUND, rules == NON_GROUND)
+    assert np.all(result.labels[rules != NON_GROUND] == UNKNOWN)
+    assert np.all(result.confidence[rules == NON_GROUND] == 1.0)
+
+
+@pytest.mark.parametrize("bad", [-0.1, 1.1])
+def test_min_confidence_out_of_range_is_rejected(bad):
+    with pytest.raises(ValueError):
+        TerrainConfig(min_confidence=bad)
+
+
+def test_unknown_is_blocked_in_the_grid_unless_told_otherwise():
+    labels = np.full((50, 50), FLAT, dtype=np.uint8)
+    labels[:25, :25] = UNKNOWN
+    assert to_occupancy_grid(labels, 25)[0, 0] == 1
+    assert to_occupancy_grid(labels, 25, unknown_blocked=False)[0, 0] == 0
+
+
+def test_unknown_labels_become_unknown_cost_not_free_ground():
+    from argo_perception.terrain import CostmapConfig, build_costmap
+    from argo_perception.terrain.costmap import UNKNOWN as UNKNOWN_COST
+
+    cfg = CostmapConfig()
+    flat = build_costmap(np.full((240, 320), FLAT, dtype=np.uint8), cfg).costs
+    unsure = build_costmap(np.full((240, 320), UNKNOWN, dtype=np.uint8), cfg).costs
+    assert (flat == 0).any()
+    assert np.all(unsure == UNKNOWN_COST)
+    # Half unknown: those cells stay unknown, the rest are still ordinary ground.
+    half = np.full((240, 320), FLAT, dtype=np.uint8)
+    half[:, 160:] = UNKNOWN
+    costs = build_costmap(half, cfg).costs
+    middle = costs.shape[1] // 2
+    assert np.array_equal(costs[:, : middle - 2], flat[:, : middle - 2])  # left half is untouched ground
+    seen_on_right = flat[:, middle + 2 :] != UNKNOWN_COST
+    assert np.all(costs[:, middle + 2 :][seen_on_right] == UNKNOWN_COST)
+
+
+def test_selective_scores_and_unknown_column():
+    from argo_perception.terrain.metrics import N_PREDICTED, selective_scores
+
+    truth = np.array([[FLAT, FLAT, ROCKY, NON_GROUND, NON_GROUND, NON_GROUND]], dtype=np.uint8)
+    predicted = np.array([[FLAT, UNKNOWN, ROCKY, FLAT, UNKNOWN, NON_GROUND]], dtype=np.uint8)
+    scores = selective_scores(confusion(truth, predicted, N_PREDICTED))
+    assert scores["coverage"] == pytest.approx(4 / 6)
+    assert scores["accuracy"] == pytest.approx(3 / 4)
+    assert scores["missed_object"] == pytest.approx(1 / 3)
+    assert scores["object_unknown"] == pytest.approx(1 / 3)
+
+
+def test_confidence_image_keeps_shape_and_uses_one_fixed_scale(flat_scene):
+    from argo_perception.terrain import confidence_image
+
+    low = confidence_image(flat_scene, np.zeros(flat_scene.shape[:2], dtype=np.float32))
+    high = confidence_image(flat_scene, np.ones(flat_scene.shape[:2], dtype=np.float32))
+    assert low.shape == high.shape == flat_scene.shape
+    assert not np.array_equal(low[:5, :5], high[:5, :5])
+
+
+def test_overlay_legend_lists_unknown_only_when_present(flat_scene):
+    labels = np.full(flat_scene.shape[:2], FLAT, dtype=np.uint8)
+    without = overlay(flat_scene, labels)
+    labels[:10] = UNKNOWN
+    assert overlay(flat_scene, labels).shape == without.shape

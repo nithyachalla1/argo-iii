@@ -15,6 +15,7 @@ side_m: 2.0                # how far the map reaches to each side
 flat_cost: 0
 rocky_cost: 60
 blocked_ratio: 0.4         # a cell is blocked when more than this share of what it shows is non-ground
+unknown_ratio: 0.5         # a cell is unknown (255) when more than this share of what it shows is labelled unknown
 
 # --- Buffer around obstacles ---
 rover_radius_m: 0.25       # PLACEHOLDER; cells this close to an obstacle get 253 (the rover's centre must not enter)

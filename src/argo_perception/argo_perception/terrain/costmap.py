@@ -8,7 +8,7 @@ import cv2
 import numpy as np
 import yaml
 
-from .labels import FLAT, IGNORE, NON_GROUND, ROCKY
+from .labels import FLAT, IGNORE, NON_GROUND, ROCKY, UNKNOWN as UNKNOWN_LABEL
 
 # Cost values follow the ROS nav2 costmap convention.
 FREE = 0
@@ -34,6 +34,7 @@ class CostmapConfig:
     flat_cost: int = 0
     rocky_cost: int = 60
     blocked_ratio: float = 0.4
+    unknown_ratio: float = 0.5
 
     rover_radius_m: float = 0.25
     inflation_radius_m: float = 0.6
@@ -53,6 +54,8 @@ class CostmapConfig:
                 raise ValueError(f"{name} must be between {FREE} and {MAX_BUFFER}")
         if not 0 <= self.blocked_ratio < 1:
             raise ValueError("blocked_ratio must be at least 0 and below 1")
+        if not 0 <= self.unknown_ratio <= 1:
+            raise ValueError("unknown_ratio must be between 0 and 1")
         if not 0 <= self.rover_radius_m <= self.inflation_radius_m:
             raise ValueError("rover_radius_m must be at least 0 and no more than inflation_radius_m")
         if self.inflation_decay <= 0:
@@ -142,11 +145,14 @@ def build_costmap(labels: np.ndarray, cfg: CostmapConfig = CostmapConfig()) -> C
     cells = seen_labels.reshape(rows, _SAMPLES, cols, _SAMPLES).transpose(0, 2, 1, 3).reshape(rows, cols, -1)
 
     seen = (cells != IGNORE).sum(axis=2)
+    undecided = (cells == UNKNOWN_LABEL).sum(axis=2)
+    known = seen - undecided
     blocked = (cells == NON_GROUND).sum(axis=2)
     ground_cost = cfg.flat_cost * (cells == FLAT).sum(axis=2) + cfg.rocky_cost * (cells == ROCKY).sum(axis=2)
-    ground = np.maximum(seen - blocked, 1)
+    ground = np.maximum(known - blocked, 1)
 
     costs = np.round(ground_cost / ground).astype(np.uint8)
     costs[blocked > cfg.blocked_ratio * seen] = BLOCKED
-    costs[seen == 0] = UNKNOWN
+    # No information, rather than a guess: out of view, or mostly pixels the classifier would not label.
+    costs[(seen == 0) | (undecided > cfg.unknown_ratio * seen)] = UNKNOWN
     return Costmap(_add_buffer(costs, cfg), cfg.resolution_m, cfg.forward_m, cfg.side_m)

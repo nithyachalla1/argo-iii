@@ -8,7 +8,7 @@ import numpy as np
 from sklearn.ensemble import HistGradientBoostingClassifier
 
 from .features import FEATURE_NAMES
-from .labels import FLAT, IGNORE, NAMES, NON_GROUND, ROCKY
+from .labels import FLAT, IGNORE, NAMES, NON_GROUND, ROCKY, UNKNOWN
 
 
 def cell_truth(mask: np.ndarray, rows: int, cols: int, min_share: float = 0.7) -> np.ndarray:
@@ -31,10 +31,15 @@ class TerrainModel:
         trees.fit(samples, labels)
         return cls(trees)
 
-    def predict_cells(self, features: np.ndarray, non_ground_threshold: float = 0.5) -> np.ndarray:
-        """Label each cell; NON_GROUND wherever the model gives it at least non_ground_threshold.
+    def predict_cells(
+        self, features: np.ndarray, non_ground_threshold: float = 0.5, min_confidence: float = 0.0
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """Return (labels, confidence) per cell.
 
-        Below 0.5 this finds more objects at the cost of blocking more ground.
+        Confidence is the model's chance for the label it chose: NON_GROUND wherever the model gives
+        that at least non_ground_threshold (below 0.5 this finds more objects at the cost of blocking
+        more ground), otherwise the likelier of FLAT and ROCKY. Cells under min_confidence are
+        labelled UNKNOWN; their confidence is still reported.
         """
         rows, cols, count = features.shape
         chances = self.trees.predict_proba(features.reshape(-1, count))
@@ -43,7 +48,9 @@ class TerrainModel:
         full[:, self.trees.classes_] = chances
         labels = np.where(full[:, FLAT] >= full[:, ROCKY], FLAT, ROCKY)
         labels[full[:, NON_GROUND] >= non_ground_threshold] = NON_GROUND
-        return labels.astype(np.uint8).reshape(rows, cols)
+        confidence = np.take_along_axis(full, labels[:, None], axis=1)[:, 0]
+        labels[confidence < min_confidence] = UNKNOWN
+        return labels.astype(np.uint8).reshape(rows, cols), confidence.astype(np.float32).reshape(rows, cols)
 
     def save(self, path) -> None:
         Path(path).parent.mkdir(parents=True, exist_ok=True)

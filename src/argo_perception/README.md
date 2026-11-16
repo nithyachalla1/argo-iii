@@ -11,6 +11,7 @@ Labels every part of a photo as one of:
 | 0 | `flat` | smooth ground |
 | 1 | `rocky` | rough ground |
 | 2 | `non_ground` | an object, or anything that is not ground |
+| 3 | `unknown` | the trained model is not confident enough to say (trained model only, see below) |
 
 ### Setup
 
@@ -70,6 +71,24 @@ grid = to_occupancy_grid(result.labels, cell_size=25, rocky_blocked=True)
 
 `grid` holds 1 for blocked cells and 0 for free cells, indexed `[row, col]`. It can be passed directly to a grid route planner such as `a_star_search` on the `candidate_map` branch.
 
+### Confidence and unknown
+
+With `--model`, every cell has a confidence from 0 to 1: the model's chance for the label it gave. Pass `--min-confidence 0.7` and cells under that are labelled `unknown` instead of being guessed. Each photo also gets `<name>_confidence.jpg` (dark purple is a guess, yellow is certain, one fixed scale for every photo) and `<name>_confidence.npy`.
+
+```bash
+.venv/bin/python scripts/classify_terrain.py photos/ --out out/ --model models/terrain_rugd.joblib --ground-prior bottom --min-confidence 0.7
+```
+
+In Python, `classify_terrain(image, cfg, model)` returns `result.confidence` (per pixel; `None` for the hand-set rules) and puts `UNKNOWN` in `result.labels` when `cfg.min_confidence` is set. In the costmap an unknown area is 255 ("no information"); in `to_occupancy_grid` it counts as blocked.
+
+To measure a threshold on labelled photos, in any folder laid out as in `data/terrain/README.md`:
+
+```bash
+.venv/bin/python scripts/evaluate_confidence.py --data path/to/data --split test --thresholds 0.5 0.7 0.9
+```
+
+It prints one table per group of photos (the name before the last underscore). Results for RUGD are in `docs/decisions.md`.
+
 ### Top-down costmap
 
 `build_costmap` projects the labels onto the ground in front of the rover and returns a grid in metres (10 cm cells, 4 m ahead and 2 m to each side by default). Costs follow the ROS nav2 convention:
@@ -81,7 +100,7 @@ grid = to_occupancy_grid(result.labels, cell_size=25, rocky_blocked=True)
 | 1 to 252 | close to an obstacle; higher is closer |
 | 253 | so close to an obstacle that the rover's centre must not go there |
 | 254 | blocked (non-ground) |
-| 255 | unknown: not visible in the photo |
+| 255 | unknown: not visible in the photo, or mostly labelled `unknown` |
 
 ```python
 from argo_perception.terrain import build_costmap, costmap_image, load_costmap_config

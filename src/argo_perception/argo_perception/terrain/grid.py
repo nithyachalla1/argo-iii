@@ -1,18 +1,24 @@
 import numpy as np
 
-from .labels import NON_GROUND, ROCKY
+from .labels import NON_GROUND, ROCKY, UNKNOWN
 
 
 def to_occupancy_grid(
     labels: np.ndarray,
     cell_size: int = 25,
     rocky_blocked: bool = False,
+    unknown_blocked: bool = True,
     blocked_ratio: float = 0.4,
 ) -> np.ndarray:
-    """Grid of 1 (blocked) and 0 (free), indexed [row, col], for a grid route planner."""
+    """Grid of 1 (blocked) and 0 (free), indexed [row, col], for a grid route planner.
+
+    UNKNOWN pixels count as blocked unless unknown_blocked is False: do not drive where we cannot tell.
+    """
     blocked = labels == NON_GROUND
     if rocky_blocked:
         blocked |= labels == ROCKY
+    if unknown_blocked:
+        blocked |= labels == UNKNOWN
 
     rows = labels.shape[0] // cell_size
     cols = labels.shape[1] // cell_size
