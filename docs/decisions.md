@@ -146,7 +146,7 @@ The test videos were scored once, after the choices above were made on the valid
 
 ## Terrain model: confidence and an unknown label
 
-**Decision.** With the trained model, every cell now has a confidence: the model's own chance (0 to 1) for the label it gave. A cell whose confidence is under `min_confidence` (`config/terrain_classifier.yaml`, `--min-confidence` on the command line) is labelled `unknown` (value 3) instead of being forced into flat, rocky or non-ground. `min_confidence` is **0 (off) until we pick a value**; the measurements below suggest 0.7. The hand-set rules have no confidence and never say unknown.
+**Decision.** With the trained model, every cell now has a confidence: the model's own chance (0 to 1) for the label it gave. A cell whose confidence is under `min_confidence` (`config/terrain_classifier.yaml`, `--min-confidence` on the command line) is labelled `unknown` (value 3) instead of being forced into flat, rocky or non-ground. `min_confidence` defaults to **0.7** (set 2026-11-16, after the RUGD and GOOSE measurements below); 0 turns it off and 0.9 is the cautious choice. The hand-set rules have no confidence and never say unknown.
 
 **What unknown does downstream.**
 - Costmap: a cell that is mostly unknown (`unknown_ratio`, 0.5) gets cost 255, "no information", the same as ground out of view. Otherwise unknown pixels are left out of the cost average. The planner, not the classifier, then decides whether it may cross unknown cells (nav2's `allow_unknown`).

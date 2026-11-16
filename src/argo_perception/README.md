@@ -73,13 +73,13 @@ grid = to_occupancy_grid(result.labels, cell_size=25, rocky_blocked=True)
 
 ### Confidence and unknown
 
-With `--model`, every cell has a confidence from 0 to 1: the model's chance for the label it gave. Pass `--min-confidence 0.7` and cells under that are labelled `unknown` instead of being guessed. Each photo also gets `<name>_confidence.jpg` (dark purple is a guess, yellow is certain, one fixed scale for every photo) and `<name>_confidence.npy`.
+With `--model`, every cell has a confidence from 0 to 1: the model's chance for the label it gave. With the trained model, cells whose confidence is under `min_confidence` are labelled `unknown` instead of being guessed. The default is 0.7; change it in the config file or with `--min-confidence`, and 0 turns it off. Each photo also gets `<name>_confidence.jpg` (dark purple is a guess, yellow is certain, one fixed scale for every photo) and `<name>_confidence.npy`.
 
 ```bash
 .venv/bin/python scripts/classify_terrain.py photos/ --out out/ --model models/terrain_rugd.joblib --ground-prior bottom --min-confidence 0.7
 ```
 
-In Python, `classify_terrain(image, cfg, model)` returns `result.confidence` (per pixel; `None` for the hand-set rules) and puts `UNKNOWN` in `result.labels` when `cfg.min_confidence` is set. In the costmap an unknown area is 255 ("no information"); in `to_occupancy_grid` it counts as blocked.
+In Python, `classify_terrain(image, cfg, model)` returns `result.confidence` (per pixel; `None` for the hand-set rules) and puts `UNKNOWN` in `result.labels` when a cell's confidence is under `cfg.min_confidence`. In the costmap an unknown area is 255 ("no information"); in `to_occupancy_grid` it counts as blocked.
 
 To measure a threshold on labelled photos, in any folder laid out as in `data/terrain/README.md`:
 

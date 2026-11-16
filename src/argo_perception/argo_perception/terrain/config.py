@@ -32,7 +32,7 @@ class TerrainConfig:
     rocky_threshold: float = 0.5
 
     non_ground_threshold: float = 0.4
-    min_confidence: float = 0.0
+    min_confidence: float = 0.7
 
     def __post_init__(self):
         if self.ground_prior not in GROUND_PRIORS:
