@@ -23,3 +23,6 @@ out/
 
 # Downloaded public datasets (large, and not ours to redistribute)
 data/terrain/rugd/
+
+# RELLIS-3D (CC BY-NC-SA 3.0)
+data/terrain/rellis/

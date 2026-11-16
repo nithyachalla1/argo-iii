@@ -578,3 +578,32 @@ def test_overlay_legend_lists_unknown_only_when_present(flat_scene):
     without = overlay(flat_scene, labels)
     labels[:10] = UNKNOWN
     assert overlay(flat_scene, labels).shape == without.shape
+
+
+# --- RELLIS-3D label conversion ---
+
+
+def test_rellis_ids_map_to_our_labels():
+    from argo_perception.terrain.rellis import rellis_to_labels
+
+    ids = np.array([[3, 1, 34, 7, 4, 31, 33, 0]], dtype=np.uint8)
+    labels, unknown = rellis_to_labels(ids)
+    assert labels.tolist() == [[FLAT, FLAT, ROCKY, NON_GROUND, NON_GROUND, NON_GROUND, IGNORE, IGNORE]]
+    assert unknown == 0
+
+
+def test_rellis_unlisted_id_is_counted_and_not_scored():
+    from argo_perception.terrain.rellis import rellis_to_labels
+
+    labels, unknown = rellis_to_labels(np.array([[3, 200]], dtype=np.uint8))
+    assert labels.tolist() == [[FLAT, IGNORE]] and unknown == 1
+
+
+def test_rellis_name_has_one_underscore_so_groups_by_sequence():
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("prepare_rellis", REPO / "scripts" / "prepare_rellis.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    name = module.name_of("00000/pylon_camera_node/frame000308-1581624683_550.jpg")
+    assert name == "00000_frame000308" and name.rsplit("_", 1)[0] == "00000"
